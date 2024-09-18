@@ -67,6 +67,7 @@ class FeatureGranting : Hook(
     }
 
     private fun initFeatures() {
+        featureManager.add(Feature("approximate-distance", false))
         featureManager.add(Feature("ad-backfill", false))
         featureManager.add(Feature("profile-redesign-20230214", true))
         featureManager.add(Feature("notification-action-chat-20230206", true))
