@@ -11,6 +11,7 @@ import com.grindrplus.core.Utils
 import com.grindrplus.core.Utils.calculateBMI
 import com.grindrplus.core.Utils.h2n
 import com.grindrplus.core.Utils.w2n
+import com.grindrplus.core.logw
 import com.grindrplus.ui.Utils.copyToClipboard
 import com.grindrplus.ui.Utils.formatEpochSeconds
 import com.grindrplus.utils.Hook
@@ -25,8 +26,9 @@ import kotlin.math.roundToInt
 
 class ProfileDetails : Hook("Profile details", "Add extra fields and details to profiles") {
     private var boostedProfilesList = emptyList<String>()
-    private val blockedProfilesObserver = "ed.o" // search for 'Intrinsics.checkNotNullParameter(dataList, "dataList");' - typically the last match
-    private val profileViewHolder = "ed.A\$b" // search for 'Intrinsics.checkNotNullParameter(individualUnblockActivityViewModel, "individualUnblockActivityViewModel");'
+    private val blockedProfilesObserver = "Wd.q" // search for 'Intrinsics.checkNotNullParameter(dataList, "dataList");' - typically the last match
+    private val profileViewHolder = "Wd.D\$b" // search for 'Intrinsics.checkNotNullParameter(individualUnblockActivityViewModel, "individualUnblockActivityViewModel");'
+
     private val distanceUtils = "com.grindrapp.android.utils.DistanceUtils"
     private val profileBarView = "com.grindrapp.android.ui.profileV2.ProfileBarView"
     private val profileViewState = "com.grindrapp.android.ui.profileV2.model.ProfileViewState"
@@ -49,7 +51,7 @@ class ProfileDetails : Hook("Profile details", "Add extra fields and details to 
 
         findClass(blockedProfilesObserver).hook("onChanged", HookStage.AFTER) { param ->
             val profileList = getObjectField(
-                getObjectField(param.thisObject(), "a"), "F") as ArrayList<*>
+                getObjectField(param.thisObject(), "a"), "o") as ArrayList<*>
             for (profile in profileList) {
                 val profileId = callMethod(profile, "getProfileId") as String
                 val displayName =
@@ -62,7 +64,7 @@ class ProfileDetails : Hook("Profile details", "Add extra fields and details to 
 
         findClass(profileViewHolder).hookConstructor(HookStage.AFTER) { param ->
             val textView =
-                getObjectField(param.thisObject(), "p") as TextView
+                getObjectField(param.thisObject(), "b") as TextView
 
             textView.setOnLongClickListener {
                 val text = textView.text.toString()
@@ -175,7 +177,7 @@ class ProfileDetails : Hook("Profile details", "Add extra fields and details to 
                     )
                 if (Config.get("do_gui_safety_checks", true) as Boolean) {
                     if (weight.toString().contains("(")) {
-                        Logger.w("BMI details are already present?")
+                        logw("BMI details are already present?")
                         return@hook
                     }
                 }

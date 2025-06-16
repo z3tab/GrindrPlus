@@ -16,6 +16,8 @@ import com.grindrplus.core.Config
 import com.grindrplus.core.InstanceManager
 import com.grindrplus.core.Logger
 import com.grindrplus.core.LogSource
+import com.grindrplus.core.TaskScheduler
+import com.grindrplus.utils.TaskManager
 import com.grindrplus.core.Utils.handleImports
 import com.grindrplus.core.http.Client
 import com.grindrplus.core.http.Interceptor
@@ -93,12 +95,16 @@ object GrindrPlus {
     val currentActivity: Activity?
         get() = currentActivityRef?.get()
 
-    private val userAgent = "u6.f" // search for 'grindr3/'
-    private val userSession = "Bb.o0" // search for 'com.grindrapp.android.storage.UserSessionImpl$1'
+    private val userAgent = "u6.h" // search for 'grindr3/'
+    internal val userSession = "qc.V" // search for 'com.grindrapp.android.storage.UserSessionImpl$1'
     private val deviceInfo =
-        "i4.B" // search for 'AdvertisingIdClient.Info("00000000-0000-0000-0000-000000000000", true)'
+        "h4.B" // search for 'AdvertisingIdClient.Info("00000000-0000-0000-0000-000000000000", true)'
+    internal val grindrLocationProvider = "H8.d" // search for 'system settings insufficient for location request, attempting to resolve'
+    internal val serverDrivenCascadeRepo = "com.grindrapp.android.persistence.repository.ServerDrivenCascadeRepo"
 
     private val ioScope = CoroutineScope(Dispatchers.IO)
+    private val taskScheduer = TaskScheduler(ioScope)
+    internal val taskManager = TaskManager(taskScheduer)
     private var currentActivityRef: WeakReference<Activity>? = null
 
     private val splineDataEndpoint =
@@ -140,6 +146,24 @@ object GrindrPlus {
         this.hookManager = HookManager()
         this.instanceManager = InstanceManager(classLoader)
         this.packageName = context.packageName
+
+        if (bridgeClient.shouldRegenAndroidId(packageName)) {
+            Logger.i("Generating new Android device ID", LogSource.MODULE)
+            val androidId = java.util.UUID.randomUUID()
+                .toString().replace("-", "").lowercase().take(16)
+            Config.put("android_device_id", androidId)
+        }
+
+        val forcedCoordinates = bridgeClient.getForcedLocation(packageName)
+        if (forcedCoordinates.isNotEmpty()) {
+            val parts = forcedCoordinates.split(",").map { it.trim() }
+            if (parts.size != 2 || parts.any { it.toDoubleOrNull() == null }) {
+                Logger.w("Invalid forced coordinates format: $forcedCoordinates", LogSource.MODULE)
+            } else {
+                Logger.i("Using forced coordinates: $forcedCoordinates", LogSource.MODULE)
+                Config.put("forced_coordinates", forcedCoordinates)
+            }
+        }
 
         application.registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
@@ -187,13 +211,16 @@ object GrindrPlus {
                 userAgent,
                 userSession,
                 deviceInfo,
+                grindrLocationProvider,
+                serverDrivenCascadeRepo
             )
 
             instanceManager.setCallback(userSession) { uSession ->
-                myProfileId = getObjectField(uSession, "r") as String
+                myProfileId = getObjectField(uSession, "t") as String
                 instanceManager.setCallback(userAgent) { uAgent ->
                     instanceManager.setCallback(deviceInfo) { dInfo ->
                         httpClient = Client(Interceptor(uSession, uAgent, dInfo))
+                        taskManager.registerTasks() // Tasks require httpClient
                     }
                 }
             }
@@ -231,6 +258,7 @@ object GrindrPlus {
 
         hookManager.init()
     }
+
 
     fun runOnMainThread(appContext: Context? = null, block: (Context) -> Unit) {
         val useContext = appContext ?: context

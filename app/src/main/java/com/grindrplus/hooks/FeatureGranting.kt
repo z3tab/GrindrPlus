@@ -1,7 +1,7 @@
 package com.grindrplus.hooks
 
-import com.grindrplus.GrindrPlus
 import com.grindrplus.core.Config
+import com.grindrplus.core.logi
 import com.grindrplus.utils.Feature
 import com.grindrplus.utils.FeatureManager
 import com.grindrplus.utils.Hook
@@ -15,15 +15,17 @@ class FeatureGranting : Hook(
     "Feature granting",
     "Grant all Grindr features"
 ) {
-    private val featureFlagManager = "u7.d" // search for 'experiments, @NotNull String featureFlagName,'
-    private val isFeatureFlagEnabled = "S9.b" // search for 'implements IsFeatureFlagEnabled {'
+    private val featureFlagManager = "J7.d" // search for 'experiments, @NotNull String featureFlagName,'
+    private val isFeatureFlagEnabled = "ya.b" // search for 'implements IsFeatureFlagEnabled {'
     private val upsellsV8Model = "com.grindrapp.android.model.UpsellsV8"
     private val insertsModel = "com.grindrapp.android.model.Inserts"
-    private val expiringAlbumsExperiment = "O3.a" // search for '("SeeAlbumOptions", 1, "see-album-options")'
     private val favoritesExperiment = "com.grindrapp.android.favoritesv2.domain.experiment.FavoritesV2Experiment" // search for 'public final class FavoritesV2Experiment'
+    private val albumSpankBankExperiment = "b4.b" // search for 'spankBankExperiment'
     private val settingDistanceVisibilityViewModel =
         "com.grindrapp.android.ui.settings.distance.a\$e" // search for 'UiState(distanceVisibility='
     private val featureModel = "com.grindrapp.android.usersession.model.Feature"
+    private val tapModel = "com.grindrapp.android.taps.model.Tap"
+    private val tapInboxModel = "com.grindrapp.android.taps.data.model.TapsInboxEntity"
     private val featureManager = FeatureManager()
 
     override fun init() {
@@ -34,6 +36,13 @@ class FeatureGranting : Hook(
             if (featureManager.isManaged(flagKey)) {
                 param.setResult(featureManager.isEnabled(flagKey))
             }
+        }
+
+        findClass(albumSpankBankExperiment).hook("f", HookStage.BEFORE) { param ->
+            // This controls the newly added Albums 'Spank Bank' experiment, which
+            // adds blur to the last album(s) of your collection. Returning false
+            // disables this feature.
+            param.setResult(Config.get("enable_albums_spank_bank", false) as Boolean)
         }
 
         findClass(featureModel).hook("isGranted", HookStage.BEFORE) { param ->
@@ -59,11 +68,6 @@ class FeatureGranting : Hook(
                 }
         }
 
-        findClass(expiringAlbumsExperiment)
-            .hook("b", HookStage.BEFORE) { param ->
-                param.setResult(false)
-            }
-
         findClass(favoritesExperiment)
             .hook("e", HookStage.BEFORE) { param ->
                 if (Config.get("separated_favorites_section", true) as Boolean) {
@@ -71,8 +75,14 @@ class FeatureGranting : Hook(
                 }
             }
 
+        listOf(tapModel, tapInboxModel).forEach { model ->
+            findClass(model).hook("isViewable", HookStage.BEFORE) { param ->
+                param.setResult(true)
+            }
+        }
+
         findClass(featureFlagManager)
-            .hook("b", HookStage.AFTER) { param ->
+            .hook("a", HookStage.AFTER) { param ->
                 val featureFlagName = getObjectField(param.thisObject(), "b") as String
                 if (featureManager.isManaged(featureFlagName)) {
                     param.setResult(featureManager.isEnabled(featureFlagName))

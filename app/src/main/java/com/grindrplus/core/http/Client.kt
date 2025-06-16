@@ -180,6 +180,30 @@ class Client(interceptor: Interceptor) {
         }
     }
 
+    fun updateLocation(geohash: String) {
+        val body = """
+            {
+                "geohash": "$geohash"
+            }
+        """.trimIndent()
+
+        GrindrPlus.executeAsync {
+            val response = sendRequest(
+                "https://grindr.mobi/v4/location",
+                "PUT",
+                body = body.toRequestBody(),
+                headers = mapOf("Content-Type" to "application/json; charset=UTF-8")
+            )
+            if (response.isSuccessful) {
+                showToast(Toast.LENGTH_LONG, "Location updated successfully")
+            } else {
+                response.useBody { errorBody ->
+                    showToast(Toast.LENGTH_LONG, "Failed to update location: $errorBody")
+                }
+            }
+        }
+    }
+
     fun reportUser(
         profileId: String,
         reason: String = "SPAM",
@@ -199,7 +223,8 @@ class Client(interceptor: Interceptor) {
             val response = sendRequest(
                 "https://grindr.mobi/v3.1/flags/$profileId",
                 "POST",
-                body = body.toRequestBody()
+                body = body.toRequestBody(),
+                headers = mapOf("Content-Type" to "application/json; charset=UTF-8")
             )
 
             if (response.isSuccessful) {
@@ -209,6 +234,54 @@ class Client(interceptor: Interceptor) {
                     showToast(Toast.LENGTH_LONG, "Failed to report user: $errorBody")
                 }
             }
+        }
+    }
+
+    suspend fun fetchCascade(
+        nearbyGeoHash: String,
+        onlineOnly: Boolean = false,
+        photoOnly: Boolean = false,
+        faceOnly: Boolean = false,
+        notRecentlyChatted: Boolean = false,
+        fresh: Boolean = false,
+        pageNumber: Int = 1,
+        favorites: Boolean = false,
+        showSponsoredProfiles: Boolean = false,
+        shuffle: Boolean = false
+    ): JSONObject = withContext(Dispatchers.IO) {
+        try {
+            val url = buildString {
+                append("https://grindr.mobi/v3/cascade?nearbyGeoHash=$nearbyGeoHash")
+                append("&onlineOnly=$onlineOnly")
+                append("&photoOnly=$photoOnly")
+                append("&faceOnly=$faceOnly")
+                append("&notRecentlyChatted=$notRecentlyChatted")
+                append("&fresh=$fresh")
+                append("&pageNumber=$pageNumber")
+                append("&favorites=$favorites")
+                append("&showSponsoredProfiles=$showSponsoredProfiles")
+                append("&shuffle=$shuffle")
+            }
+
+            val response = sendRequest(url, "GET")
+            if (response.isSuccessful) {
+                response.useBody { responseBody ->
+                    if (!responseBody.isNullOrEmpty()) {
+                        return@withContext JSONObject(responseBody)
+                    }
+                    JSONObject()
+                }
+            } else {
+                Logger.e("Failed to get nearby profiles: ${response.code}")
+                response.useBody { errorBody ->
+                    Logger.e("Error body: $errorBody")
+                }
+                JSONObject()
+            }
+        } catch (e: Exception) {
+            Logger.e("Failed to get nearby profiles: ${e.message}")
+            Logger.writeRaw(e.stackTraceToString())
+            JSONObject()
         }
     }
 

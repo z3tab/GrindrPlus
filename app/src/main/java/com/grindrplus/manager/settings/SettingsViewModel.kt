@@ -13,6 +13,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.grindrplus.core.Config
 import com.grindrplus.manager.DATA_URL
+import com.grindrplus.manager.settings.SettingsUtils.testMapsApiKey
 import com.grindrplus.manager.utils.AppIconManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +29,38 @@ class SettingsViewModel(
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading
+
+    private val _showApiKeyTestDialog = MutableStateFlow(false)
+    val showApiKeyTestDialog: StateFlow<Boolean> = _showApiKeyTestDialog
+
+    private val _apiKeyTestTitle = MutableStateFlow("")
+    val apiKeyTestTitle: StateFlow<String> = _apiKeyTestTitle
+
+    private val _apiKeyTestMessage = MutableStateFlow("")
+    val apiKeyTestMessage: StateFlow<String> = _apiKeyTestMessage
+
+    private val _apiKeyTestRawResponse = MutableStateFlow("")
+    val apiKeyTestRawResponse: StateFlow<String> = _apiKeyTestRawResponse
+
+    private val _apiKeyTestLoading = MutableStateFlow(false)
+    val apiKeyTestLoading: StateFlow<Boolean> = _apiKeyTestLoading
+
+    fun dismissApiKeyTestDialog() {
+        _showApiKeyTestDialog.value = false
+    }
+
+    private fun showApiKeyTestDialog(
+        isLoading: Boolean,
+        title: String,
+        message: String,
+        rawResponse: String
+    ) {
+        _apiKeyTestLoading.value = isLoading
+        _apiKeyTestTitle.value = title
+        _apiKeyTestMessage.value = message
+        _apiKeyTestRawResponse.value = rawResponse
+        _showApiKeyTestDialog.value = true
+    }
 
     init {
         loadSettings()
@@ -48,6 +81,22 @@ class SettingsViewModel(
                         onCheckedChange = {
                             viewModelScope.launch {
                                 Config.setHookEnabled(hookName, it)
+                                loadSettings()
+                            }
+                        }
+                    )
+                }
+
+                val tasks = Config.getTasksSettings()
+                val taskSettings = tasks.map { (taskId, pair) ->
+                    SwitchSetting(
+                        id = taskId,
+                        title = taskId,
+                        description = pair.first,
+                        isChecked = pair.second,
+                        onCheckedChange = {
+                            viewModelScope.launch {
+                                Config.setTaskEnabled(taskId, it)
                                 loadSettings()
                             }
                         }
@@ -114,6 +163,24 @@ class SettingsViewModel(
                             if (value == null || value <= 0) "Duration must be a positive number" else null
                         }
                     ),
+                    TextSetting(
+                        id = "favorites_grid_columns",
+                        title = "Favorites grid columns",
+                        description = "Number of columns in the favorites grid (default: 3)",
+                        value = Config.get("favorites_grid_columns", 3).toString(),
+                        onValueChange = {
+                            val value = it.toIntOrNull() ?: 3
+                            viewModelScope.launch {
+                                Config.put("favorites_grid_columns", value)
+                                loadSettings()
+                            }
+                        },
+                        keyboardType = KeyboardType.Number,
+                        validator = { input ->
+                            val value = input.toIntOrNull()
+                            if (value == null || value <= 0) "Number of columns must be a positive number" else null
+                        }
+                    ),
                     TextSettingWithButtons(
                         id = "android_device_id",
                         title = "Android Device ID",
@@ -143,6 +210,18 @@ class SettingsViewModel(
                             }
                         )
 
+                    ),
+                    SwitchSetting(
+                        id = "enable_albums_spank_bank",
+                        title = "Enable Albums Spank Bank",
+                        description = "Enable the new Albums section",
+                        isChecked = Config.get("enable_albums_spank_bank", false) as Boolean,
+                        onCheckedChange = {
+                            viewModelScope.launch {
+                                Config.put("enable_albums_spank_bank", it)
+                                loadSettings()
+                            }
+                        }
                     ),
                     SwitchSetting(
                         id = "enable_interest_section",
@@ -219,7 +298,7 @@ class SettingsViewModel(
                 )
 
                 val managerSettings = mutableListOf<Setting>(
-                    TextSetting(
+                    TextSettingWithButtons(
                         id = "maps_api_key",
                         title = "Maps API Key",
                         description = "Use a custom Maps API Key when using Grindr Plus with LSPatch",
@@ -230,7 +309,22 @@ class SettingsViewModel(
                                 loadSettings()
                             }
                         },
-                        validator = { null }
+                        validator = { null },
+                        buttons = listOf(
+                            ButtonAction("Test") {
+                                val apiKey = Config.get("maps_api_key", "") as String
+                                if (apiKey.isBlank()) {
+                                    Toast.makeText(context, "Please enter an API key first", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    testMapsApiKey(
+                                        context,
+                                        viewModelScope,
+                                        apiKey,
+                                        ::showApiKeyTestDialog
+                                    )
+                                }
+                            }
+                        )
                     ),
                     TextSetting(
                         id = "custom_manifest",
@@ -279,18 +373,6 @@ class SettingsViewModel(
                         }
                     ),
                     SwitchSetting(
-                        id = "enable_watchdog_service",
-                        title = "Keep Grindr Plus alive",
-                        description = "Keep Grindr Plus alive in the background (may drain battery)",
-                        isChecked = Config.get("watchdog_service", false) as Boolean,
-                        onCheckedChange = {
-                            viewModelScope.launch {
-                                Config.put("enable_watchdog_service", it)
-                                loadSettings()
-                            }
-                        }
-                    ),
-                    SwitchSetting(
                         id = "disable_permission_checks",
                         title = "Disable permission checks",
                         description = "Disable permission checks on startup (not recommended)",
@@ -324,6 +406,11 @@ class SettingsViewModel(
                         id = "hooks",
                         title = "Manage Hooks",
                         settings = hookSettings
+                    ),
+                    SettingGroup(
+                        id = "tasks",
+                        title = "Manage Tasks",
+                        settings = taskSettings
                     ),
                     SettingGroup(
                         id = "other",

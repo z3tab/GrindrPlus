@@ -16,6 +16,7 @@ import com.grindrplus.GrindrPlus.httpClient
 import com.grindrplus.GrindrPlus.isImportingSomething
 import com.grindrplus.GrindrPlus.shouldTriggerAntiblock
 import com.grindrplus.core.Constants.NEWLINE
+import de.robv.android.xposed.XposedHelpers.callMethod
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -145,6 +146,13 @@ object Utils {
         } catch (e: Exception) {
             null
         }
+    }
+
+    fun coordsToGeoHash(lat: Double, lon: Double, precision: Int = 12): String {
+        return GrindrPlus.loadClass("ch.hsr.geohash.GeoHash")
+            .getMethod("geoHashStringWithCharacterPrecision",
+                Double::class.java, Double::class.java, Int::class.java)
+            .invoke(null, lat, lon, precision) as String
     }
 
     @SuppressLint("SetTextI18n")

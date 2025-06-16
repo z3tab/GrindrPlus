@@ -30,6 +30,7 @@ import androidx.core.view.children
 import com.grindrplus.GrindrPlus
 import com.grindrplus.core.Config
 import com.grindrplus.core.Logger
+import com.grindrplus.core.logw
 import com.grindrplus.persistence.model.TeleportLocationEntity
 import com.grindrplus.ui.Utils
 import com.grindrplus.utils.Hook
@@ -52,7 +53,6 @@ class LocationSpoofer : Hook(
 
     override fun init() {
         val locationClass = findClass(location)
-        val appConfigurationClass = findClass(appConfiguration)
 
         if (Build.VERSION.SDK_INT >= 31) {
             locationClass.hook(
@@ -97,19 +97,13 @@ class LocationSpoofer : Hook(
                 locationButtonExists = chatBottomToolbarLinearLayout.children.any { view ->
                     if (view is ImageButton) {
                         view.tag == "custom_location_button" ||
-                                view.contentDescription == "Teleport" ||
-                                (view.drawable != null && view.drawable.constantState ==
-                                        ResourcesCompat.getDrawable(
-                                            chatBottomToolbarLinearLayout.context.resources,
-                                            Utils.getId("ic_my_location", "drawable", chatBottomToolbarLinearLayout.context),
-                                            null
-                                        )?.constantState)
+                                view.contentDescription == "Teleport"
                     } else false
                 }
             }
 
             if (locationButtonExists) {
-                Logger.w("Location button already exists?")
+                logw("Location button already exists?")
                 return@hookConstructor
             }
 
@@ -126,14 +120,14 @@ class LocationSpoofer : Hook(
                     Utils.getId(
                         "image_button_ripple",
                         "drawable",
-                        chatBottomToolbarLinearLayout.context
+                        GrindrPlus.context
                     )
                 )
                 setImageResource(
                     Utils.getId(
                         "ic_my_location",
                         "drawable",
-                        chatBottomToolbarLinearLayout.context
+                        GrindrPlus.context
                     )
                 )
                 setPadding(
