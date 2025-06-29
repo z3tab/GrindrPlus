@@ -14,12 +14,12 @@ class QuickBlock : Hook(
     "Quick block",
     "Ability to block users quickly"
 ) {
-    private val blockViewModel = "ge.b" // search for '("STATUS_BLOCK_DIALOG_SHOWN", 1)'
-    private val profileViewHolder = "com.grindrapp.android.ui.profileV2.d" // search for 'com.grindrapp.android.ui.profileV2.ProfileViewHolder$onBind$3'
+    private val blockViewModel = "ff.b" // search for '("STATUS_BLOCK_DIALOG_SHOWN", 1)'
+    private val profileViewHolder = "com.grindrapp.android.ui.profileV2.e" // search for 'com.grindrapp.android.ui.profileV2.ProfileViewHolder$onBind$3'
     private val profileModel = "com.grindrapp.android.persistence.model.Profile"
 
     override fun init() {
-        findClass(profileViewHolder).hook("A", HookStage.AFTER) { param ->
+        findClass(profileViewHolder).hook("x", HookStage.AFTER) { param ->
             val arg0 = param.arg(0) as Any
             val profileId = param.args().getOrNull(1) ?: return@hook
             val viewBinding = getObjectField(arg0, "b")
@@ -30,7 +30,7 @@ class QuickBlock : Hook(
             actionsMenuItem.setOnMenuItemClickListener { GrindrPlus.httpClient.blockUser(profileId as String); true }
         }
 
-        findClass(blockViewModel).hook("C", HookStage.BEFORE) { param ->
+        findClass(blockViewModel).hook("G", HookStage.BEFORE) { param ->
             val profileId = param.thisObject().javaClass.declaredFields
                 .asSequence()
                 .filter { it.type == String::class.java }
