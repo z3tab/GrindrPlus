@@ -24,9 +24,11 @@ import com.grindrplus.hooks.OnlineIndicator
 import com.grindrplus.hooks.ProfileDetails
 import com.grindrplus.hooks.ProfileViews
 import com.grindrplus.hooks.QuickBlock
+import com.grindrplus.hooks.StatusDialog
 import com.grindrplus.hooks.TimberLogging
 import com.grindrplus.hooks.UnlimitedAlbums
 import com.grindrplus.hooks.UnlimitedProfiles
+import com.grindrplus.hooks.WebSocketAlive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlin.reflect.KClass
@@ -37,11 +39,13 @@ class HookManager {
     fun registerHooks(init: Boolean = true) {
         runBlocking(Dispatchers.IO) {
             val hookList = listOf(
+                WebSocketAlive(),
                 TimberLogging(),
                 BanManagement(),
                 FeatureGranting(),
                 EnableUnlimited(),
                 AntiDetection(),
+                StatusDialog(),
                 AntiBlock(),
                 NotificationAlerts(),
                 DisableUpdates(),

@@ -78,6 +78,7 @@ import com.grindrplus.manager.ui.InstallPage
 import com.grindrplus.manager.ui.SettingsScreen
 import com.grindrplus.manager.ui.theme.GrindrPlusTheme
 import com.grindrplus.manager.utils.FileOperationHandler
+import com.grindrplus.manager.utils.isLSPosed
 import com.grindrplus.utils.HookManager
 import com.grindrplus.utils.TaskManager
 import com.onebusaway.plausible.android.AndroidResourcePlausibleConfig
@@ -89,6 +90,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import timber.log.Timber
 import timber.log.Timber.DebugTree
+
 
 internal val activityScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 internal const val TAG = "GrindrPlus"
@@ -114,7 +116,13 @@ sealed class MainNavItem(
     // data object Experiments : MainNavItem(Icons.Rounded.Science, "Experiments", { ComingSoon() })
 
     companion object {
-        val VALUES by lazy { listOf(InstallPage, Home, BlockLog, Settings) }
+        val VALUES by lazy {
+            if (isLSPosed()) {
+                listOf(Home, BlockLog, Settings)
+            } else {
+                listOf(InstallPage, Home, BlockLog, Settings)
+            }
+        }
     }
 }
 
@@ -124,7 +132,7 @@ class MainActivity : ComponentActivity() {
         val showUninstallDialog = mutableStateOf(false)
     }
 
-    private var showPermissionDialog = false
+    private var showPermissionDialog by mutableStateOf(false)
     private lateinit var receiver: NotificationActionReceiver
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -149,7 +157,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) -> {
-                    showNotificationPermissionExplanation()
+                    showPermissionDialog = true
                 }
 
                 else -> {
@@ -174,10 +182,6 @@ class MainActivity : ComponentActivity() {
             ).show()
             startActivity(intent)
         }
-    }
-
-    private fun showNotificationPermissionExplanation() {
-        showPermissionDialog = true
     }
 
     private fun registerNotificationReceiver() {

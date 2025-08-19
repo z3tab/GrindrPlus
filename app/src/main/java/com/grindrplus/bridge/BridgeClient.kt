@@ -107,6 +107,10 @@ class BridgeClient(private val context: Context) {
         Logger.d("Stopped service watchdog", LogSource.BRIDGE)
     }
 
+    fun isConnected(): Boolean {
+        return isBound.get()
+    }
+
     fun getService(): IBridgeService? = bridgeService
 
     suspend fun connectWithRetry(maxRetries: Int = 3, retryDelay: Long = 1000): Boolean {
@@ -557,6 +561,59 @@ class BridgeClient(private val context: Context) {
         } catch (e: Exception) {
             Logger.e("Error getting forced location: ${e.message}", LogSource.BRIDGE)
             ""
+        }
+    }
+
+    fun deleteForcedLocation(packageName: String) {
+        if (!isBound.get()) {
+            if (connectBlocking(3000)) {
+                Logger.d("Connected to service on-demand for deleteForcedLocation", LogSource.BRIDGE)
+            } else {
+                Logger.w("Cannot delete forced location, service not bound", LogSource.BRIDGE)
+                return
+            }
+        }
+
+        try {
+            bridgeService?.deleteForcedLocation(packageName)
+        } catch (e: Exception) {
+            Logger.e("Error deleting forced location: ${e.message}", LogSource.BRIDGE)
+        }
+    }
+
+    fun isRooted(): Boolean {
+        if (!isBound.get()) {
+            if (connectBlocking(3000)) {
+                Logger.d("Connected to service on-demand for isRooted", LogSource.BRIDGE)
+            } else {
+                Logger.w("Cannot check root status, service not bound", LogSource.BRIDGE)
+                return false
+            }
+        }
+
+        return try {
+            bridgeService?.isRooted() ?: false
+        } catch (e: Exception) {
+            Logger.e("Error checking root status: ${e.message}", LogSource.BRIDGE)
+            false
+        }
+    }
+
+    fun isLSPosed(): Boolean {
+        if (!isBound.get()) {
+            if (connectBlocking(3000)) {
+                Logger.d("Connected to service on-demand for isLSPosed", LogSource.BRIDGE)
+            } else {
+                Logger.w("Cannot check LSPosed status, service not bound", LogSource.BRIDGE)
+                return false
+            }
+        }
+
+        return try {
+            bridgeService?.isLSPosed() ?: false
+        } catch (e: Exception) {
+            Logger.e("Error checking LSPosed status: ${e.message}", LogSource.BRIDGE)
+            false
         }
     }
 }

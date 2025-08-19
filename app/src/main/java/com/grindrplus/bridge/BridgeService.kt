@@ -358,10 +358,25 @@ class BridgeService : Service() {
         override fun getForcedLocation(packageName: String): String {
             val coordinatesFile = File(getExternalFilesDir(null), "$packageName.location")
             return if (coordinatesFile.exists()) {
-                coordinatesFile.readText().ifBlank { "0.0,0.0" }
+                coordinatesFile.readText().trim().ifBlank { "" }
             } else {
-                "0.0,0.0"
+                ""
             }
+        }
+
+        override fun deleteForcedLocation(packageName: String) {
+            val coordinatesFile = File(getExternalFilesDir(null), "$packageName.location")
+            if (coordinatesFile.exists()) {
+                coordinatesFile.delete()
+            }
+        }
+
+        override fun isRooted(): Boolean {
+            return com.grindrplus.manager.utils.isRooted(applicationContext)
+        }
+
+        override fun isLSPosed(): Boolean {
+            return com.grindrplus.manager.utils.isLSPosed()
         }
     }
 

@@ -26,8 +26,8 @@ import kotlin.math.roundToInt
 
 class ProfileDetails : Hook("Profile details", "Add extra fields and details to profiles") {
     private var boostedProfilesList = emptyList<String>()
-    private val blockedProfilesObserver = "Ve.p" // search for 'Intrinsics.checkNotNullParameter(dataList, "dataList");' - typically the last match
-    private val profileViewHolder = "Ve.D\$b" // search for 'Intrinsics.checkNotNullParameter(individualUnblockActivityViewModel, "individualUnblockActivityViewModel");'
+    private val blockedProfilesObserver = "cf.p" // search for 'Intrinsics.checkNotNullParameter(dataList, "dataList");' - typically the last match
+    private val profileViewHolder = "cf.F\$b" // search for 'Intrinsics.checkNotNullParameter(individualUnblockActivityViewModel, "individualUnblockActivityViewModel");'
 
     private val distanceUtils = "com.grindrapp.android.utils.DistanceUtils"
     private val profileBarView = "com.grindrapp.android.ui.profileV2.ProfileBarView"
@@ -109,40 +109,57 @@ class ProfileDetails : Hook("Profile details", "Add extra fields and details to 
                         "Profile ID" to profileId,
                         "Approximate distance" to
                                 Utils.safeGetField(param.arg(0), "approximateDistance") as? Boolean,
-                        "Found via teleport" to
-                                Utils.safeGetField(param.arg(0), "foundViaTeleport") as? Boolean,
                         "Favorite" to
                                 Utils.safeGetField(param.arg(0), "isFavorite") as? Boolean,
                         "From viewed me" to
                                 Utils.safeGetField(param.arg(0), "isFromViewedMe") as? Boolean,
-                        "Inaccessible profile" to
-                                Utils.safeGetField(param.arg(0), "isInaccessibleProfile")
-                                        as? Boolean,
                         "JWT boosting" to
                                 Utils.safeGetField(param.arg(0), "isJwtBoosting") as? Boolean,
                         "New" to Utils.safeGetField(param.arg(0), "isNew") as? Boolean,
                         "Teleporting" to
                                 Utils.safeGetField(param.arg(0), "isTeleporting") as? Boolean,
                         "Online now" to
-                                Utils.safeGetField(param.arg(0), "onlineNow") as? Boolean
+                                Utils.safeGetField(param.arg(0), "onlineNow") as? Boolean,
+                        "Is roaming" to
+                                Utils.safeGetField(param.arg(0), "isRoaming") as? Boolean,
+                        "Found via roam" to
+                                Utils.safeGetField(param.arg(0), "foundViaRoam") as? Boolean,
+                        "Is top pick" to
+                                Utils.safeGetField(param.arg(0), "isTopPick") as? Boolean,
+                        "Is visiting" to
+                                Utils.safeGetField(param.arg(0), "isVisiting") as? Boolean,
+                        "Is distance approximate" to
+                                Utils.safeGetField(param.arg(0), "approximateDistance") as? Boolean,
                     )
                         .filterValues { it != null }
+
+                val detailsText = properties.map { (key, value) -> "• $key: $value" }.joinToString("\n")
 
                 val dialog =
                     AlertDialog.Builder(it.context)
                         .setTitle("Hidden profile details")
-                        .setMessage(
-                            properties.map { (key, value) -> "• $key: $value" }.joinToString("\n")
-                        )
+                        .setMessage(detailsText)
                         .setPositiveButton("OK") { dialog, _ -> dialog.dismiss() }
+                        .setNeutralButton("Copy Details") { dialog, _ ->
+                            copyToClipboard("Profile Details", detailsText)
+                            GrindrPlus.showToast(Toast.LENGTH_SHORT, "Profile details copied to clipboard")
+                            dialog.dismiss()
+                        }
                         .create()
+
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(android.graphics.Color.WHITE)
+                    dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(android.graphics.Color.WHITE)
+                    dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(android.graphics.Color.WHITE)
+                }
 
                 dialog.show()
             }
         }
 
         findClass(distanceUtils).hook("c", HookStage.AFTER) { param ->
-            val distance = param.arg<Double>(1)
+            val distance = param.arg<Double>(0)
+            // val isAbbreviated = param.arg<Boolean>(1)
             val isFeet = param.arg<Boolean>(2)
 
             param.setResult(
@@ -165,32 +182,34 @@ class ProfileDetails : Hook("Profile details", "Add extra fields and details to 
         }
 
         findClass(profileViewState).hook("getWeight", HookStage.AFTER) { param ->
-            val weight = param.getResult()
-            val height = callMethod(param.thisObject(), "getHeight")
+            if (Config.get("show_bmi_in_profile", true) as Boolean) {
+                val weight = param.getResult()
+                val height = callMethod(param.thisObject(), "getHeight")
 
-            if (weight != null && height != null) {
-                val BMI =
-                    calculateBMI(
-                        "kg" in weight.toString(),
-                        w2n("kg" in weight.toString(), weight.toString()),
-                        h2n("kg" in weight.toString(), height.toString())
-                    )
-                if (Config.get("do_gui_safety_checks", true) as Boolean) {
-                    if (weight.toString().contains("(")) {
-                        logw("BMI details are already present?")
-                        return@hook
+                if (weight != null && height != null) {
+                    val BMI =
+                        calculateBMI(
+                            "kg" in weight.toString(),
+                            w2n("kg" in weight.toString(), weight.toString()),
+                            h2n("kg" in weight.toString(), height.toString())
+                        )
+                    if (Config.get("do_gui_safety_checks", true) as Boolean) {
+                        if (weight.toString().contains("(")) {
+                            logw("BMI details are already present?")
+                            return@hook
+                        }
                     }
+                    param.setResult(
+                        "$weight - ${String.format("%.1f", BMI)} (${
+                            mapOf(
+                                "Underweight" to 18.5,
+                                "Normal weight" to 24.9,
+                                "Overweight" to 29.9,
+                                "Obese" to Double.MAX_VALUE
+                            ).entries.first { it.value > BMI }.key
+                        })"
+                    )
                 }
-                param.setResult(
-                    "$weight - ${String.format("%.1f", BMI)} (${
-                        mapOf(
-                            "Underweight" to 18.5,
-                            "Normal weight" to 24.9,
-                            "Overweight" to 29.9,
-                            "Obese" to Double.MAX_VALUE
-                        ).entries.first { it.value > BMI }.key
-                    })"
-                )
             }
         }
     }
